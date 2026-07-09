@@ -2,7 +2,7 @@
 
 Documentation for [Play198x](https://github.com/play198x), the 198x family's retro media player/viewer.
 
-Play198x is **decided but not yet started** — no near-term pull — so this repo is a placeholder until work begins.
+Play198x is **not yet started** — no near-term pull — so this repo currently holds design notes and future documentation space.
 
 ## Scope (eventually)
 
