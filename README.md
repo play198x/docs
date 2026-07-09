@@ -12,6 +12,6 @@ Play198x is **not yet started** — no near-term pull — so this repo currently
 
 ## Not here
 
-- The decision to pursue Play198x and its boundaries — the umbrella decision record `play198x-media-player.md`.
+- The decision to pursue Play198x and its boundaries — the umbrella decision record [`../../decisions/play198x-media-player.md`](../../decisions/play198x-media-player.md).
 - Whole-machine emulation and the chip cores it reuses — Emu198x.
 - Hardware facts — the umbrella `reference/` library.
