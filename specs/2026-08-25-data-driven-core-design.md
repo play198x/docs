@@ -107,7 +107,7 @@ oversight.
 
 ### Play198x — the player
 
-One repo, `play198x/play198x`, two crates. The GUI is a standalone crate
+One repo, `play198x/play198x`, three crates. The shells are standalone crates
 excluded from the workspace so the library keeps its own lints and profiles —
 the arrangement `cat198x` already uses for its Tauri UI.
 
@@ -121,11 +121,11 @@ the arrangement `cat198x` already uses for its Tauri UI.
 | `engine` | The ProTracker mixer. |
 | `metadata` | What the interface shows about a work. |
 
-**`play198x-gui`** — an `eframe`/`egui` application. A thin client that holds no
-logic of its own: anything it can do is an operation the core exposes, which is
-what makes a scriptable surface a later addition rather than a retrofit
-(binding decision, clause 7 — reachable from Forge198x with agent-native
-parity).
+**`play198x-gui`** — a GPUI desktop application, and `play198x-web` — a
+WASM shell for the site. Both are thin clients holding no logic of their own: anything a shell can do is
+an operation the core exposes, which is what makes a scriptable surface a later
+addition rather than a retrofit (binding decision, clause 7 — reachable from
+Forge198x with agent-native parity).
 
 #### Constraints the core carries for surfaces it does not yet have
 
@@ -142,28 +142,56 @@ though nothing in this slice exercises them:
   file and must produce a picture quickly; nothing may do lazy global init that
   assumes a long-lived process.
 - **No assumption that an OS audio device exists** — already required by the
-  engine rule, restated here because three separate surfaces now depend on it.
+  engine rule, restated here because four separate consumers now depend on it:
+  the desktop app, the web shell, the differential harness, and the thumbnailers.
 
-### Why egui rather than Tauri
+### Why GPUI, and why two shells rather than one
 
-`cat198x/decisions/agent-native-surface-and-ui.md` chose Tauri for a
-data-management UI and stated the choice does not transfer to real-time
-rendering. Play198x sits between the two, and three things settle it: `eframe`
-compiles to **both** native and WASM from one source, where Tauri has no
-web-embed story — and the binding decision requires embeddable previews;
-animation in a later slice needs a field-rate framebuffer, which that same
-Cat198x decision says Tauri fights; and Emu198x already set the precedent for
-media-shaped UIs.
+**Desktop is GPUI** — Zed's framework, Apache-2.0, on crates.io (v0.2.2),
+hybrid immediate/retained and GPU-accelerated, with native support for macOS
+(Metal), Linux/FreeBSD (Wayland/X11) and Windows (Win32/DirectWrite) — the same
+three platforms the thumbnailer work targets.
 
-The cost is accepted and named: egui is immediate-mode, so the metadata and
-browsing surface is more work than it would be in HTML.
+It is chosen on the axis that motivated the project. The complaint about
+existing players was **interface and metadata handling**, not fidelity, and a
+rich stateful browsing surface is precisely what pure immediate-mode makes
+hardest. GPUI's retained side is built for that, and Zed is the evidence it
+carries.
+
+Tauri was rejected for the reason `cat198x/decisions/agent-native-surface-and-ui.md`
+gives: it suits data-management UIs, and explicitly does not transfer to
+real-time rendering — which animation, in a later slice, will need.
+
+**GPUI has no web or WASM support**, and no roadmap for it. That is a real cost
+and it is paid deliberately: it means the browser player is a **second, much
+smaller shell**, not the same binary. Accepted because the two shells are not
+comparable in size — the web shell needs a drop target, an image canvas and
+play/pause, where the desktop app needs the whole browsing and metadata surface.
+The core is shared; only the shell differs.
+
+**GPUI is pre-1.0 and warns of frequent breaking changes.** Accepted as a
+maintenance tax, and the reason the GUI crate stays thin: churn should land in
+one small crate, never in `play198x-core`.
+
+### The two shells
+
+| Crate | Target | Scope |
+|---|---|---|
+| `play198x-gui` | desktop, GPUI | the full application |
+| `play198x-web` | browser, `wasm-bindgen` | drop target, image canvas, play/pause — nothing more |
+
+`play198x-web` uses **no Rust UI framework**. The site is already Astro, so HTML
+and CSS provide the chrome, `<canvas>` displays decoded images, and WebAudio
+takes engine frames. `play198x-core` compiles to `wasm32-unknown-unknown` and
+does decode and mixing only. This keeps the WASM bundle small — a Rust UI
+toolkit compiled to WASM would be most of the download for a UI this thin.
 
 ## Data flow
 
 ```
 path ──► container::open ──► [Entry] ──► probe::identify ──► decode
                 (plain | zip | adf)         (from bytes)         │
-                 PP20 transparent                                ├─► Image ─► egui texture
+                 PP20 transparent                                ├─► Image ─► shell texture
                                                                  └─► Module ─► engine ─► frames
 ```
 
@@ -259,12 +287,12 @@ silently omitted. Errors surface inline against the entry; nothing is modal.
 ## Related work
 
 **The website** (`play198x/play198x.github.io`) gets its own spec. It has a real
-dependency on this one: because the GUI is `eframe`, the same application
-compiles to WASM, so the site can host the working player rather than describe
-it. That is a reason to keep `play198x-core` free of any assumption that an OS
-audio device exists — already required by the engine rule above, and noted here
-so the constraint is not weakened later by someone who does not know the site
-depends on it.
+dependency on this one: `play198x-core` compiles to `wasm32-unknown-unknown`, so
+the site can host a working player rather than describe it — via the small
+`play198x-web` shell, since GPUI has no web target. That is the reason
+`play198x-core` must stay free of any assumption that an OS audio device exists,
+and free of global state: noted here so the constraint is not weakened later by
+someone who does not know the site depends on it.
 
 **The Emu198x packaging question** — whether the chip crates are published and
 independently versioned — gates the code-driven slice and should be raised as
