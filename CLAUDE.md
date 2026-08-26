@@ -4,9 +4,11 @@ Documentation repo for Play198x. Part of the `play198x` org container; see
 [`../CLAUDE.md`](../CLAUDE.md) for the org layout and [`../../CLAUDE.md`](../../CLAUDE.md)
 for the 198x umbrella.
 
-Play198x is **started**. The data-driven core is designed and approved in
-[`specs/`](specs/); implementation has not begun. Read the specs before
-proposing changes to scope or architecture.
+Play198x is **building**. The data-driven core is designed in
+[`specs/`](specs/), planned in [`plans/`](plans/), and implemented — it probes a
+file, decodes the four image formats to RGBA, and plays a ProTracker module.
+Not yet published to crates.io. Read the specs before proposing changes to
+scope or architecture.
 
 ## Not here
 
