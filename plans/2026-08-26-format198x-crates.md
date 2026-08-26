@@ -778,7 +778,7 @@ place the widely-cited community spec is **wrong**.
 
   pub struct Sample {
       pub name_bytes: [u8; SAMPLE_NAME_LEN],
-      pub data: Vec<i8>,
+      pub data: Vec<u8>,
       pub volume: u8,
       pub finetune_byte: u8,
       pub repeat_start_words: u16,
@@ -786,6 +786,7 @@ place the widely-cited community spec is **wrong**.
   }
   impl Sample {
       pub fn name(&self) -> String;      // trimmed at NUL, decoded as ISO-8859-1
+      pub fn data_i8(&self) -> impl Iterator<Item = i8> + '_; // the mixer's view
       pub fn finetune(&self) -> i8;      // the signed low nibble
       pub fn loop_start(&self) -> usize; // bytes
       pub fn loop_len(&self) -> usize;   // bytes, 0 when not looped
@@ -819,9 +820,18 @@ place the widely-cited community spec is **wrong**.
   - **Raw bytes and words, with accessors beside them.** `title_bytes` not
     `title: String`, `order_table` not `orders: Vec<u8>` — see the
     losslessness warning below.
+  - **`data: Vec<u8>` with `data_i8()` beside it.** The file stores PCM as
+    raw bytes and losslessness means storing what the file stores; `data_i8`
+    is the mixer's signed view of the same bytes, computed on demand rather
+    than converted at parse time. (It is the one accessor without
+    `#[must_use]`: `impl Iterator` already carries the attribute, so a second
+    is a `clippy::double_must_use` error.)
   - **`trailing`.** Bytes after the last sample, kept verbatim. Real modules
-    ripped out of executables or padded to a block boundary carry them, and
-    reading them as pattern data shifts every sample's PCM into the junk.
+    ripped out of executables or stored inside a larger container carry
+    them, and reading them as pattern data shifts every sample's PCM into
+    the junk. The surplus has to be a whole number of 1024-byte units to
+    survive at all; anything else fails the divisibility check and decodes
+    as `Corrupt`.
   - **Fixed-size containers.** `[Sample; NUM_SAMPLES]` and
     `[[Note; CHANNELS]; ROWS_PER_PATTERN]` make two format invariants
     compile-time rather than run-time, so `EncodeError` needs no
@@ -989,8 +999,9 @@ repeat length in words); song length at 950; restart at 951; 128 order bytes at
 952; magic at 1080; then patterns of 1024 bytes each;
 then sample data.
 
-⚠ **Derive the pattern count from the file's own size, then cap it with the
-order table.** Two earlier rules were tried and both were wrong:
+⚠ **Derive the pattern count from the file's own size, and settle any
+dispute by looking at the disputed bytes.** Two earlier rules were tried and
+both were wrong:
 
 - *The played prefix* (`max` over `order_table[..song_length]`) drops
   "hidden" patterns — stored pattern data referenced only by order slots
@@ -1011,14 +1022,45 @@ contiguous and exhaustive, so the pattern data is exactly
 divisible by 1024 on every file across both corpora, hidden-pattern and
 garbage-tail files included.
 
-The order table then supplies a cap, because the size rule alone assumes
-nothing follows the last sample: `min(size_derived, max(order_table) + 1)`.
-A file with surplus bytes at the end — ripped out of an executable, padded
-to a block boundary — would otherwise read them as extra patterns and take
-its sample PCM from the junk, a misparse that is self-consistent and so
-invisible to any round-trip test. Surplus beyond the cap goes verbatim into
-`Module::trailing`, which `encode` appends, so the file still round-trips
-byte-for-byte.
+The size rule alone assumes nothing follows the last sample. A file with
+surplus bytes at the end — ripped out of an executable, or stored inside a
+larger container — would otherwise read them as extra patterns and take its
+sample PCM from the junk, a misparse that is self-consistent and so
+invisible to any round-trip test.
+
+Clamping to `max(order_table) + 1` was tried for that and is *also* wrong,
+in the mirror image: a file can physically store a pattern no order-table
+entry names, and clamping that file's count moves every sample's PCM read
+back into the last pattern. Reproduced with two present patterns, an order
+table whose maximum is 0, and no trailing bytes at all — sample 0's first
+PCM byte came back as 1 where the correct value was 100, and the round-trip
+was still byte-identical. Neither `min` nor the size rule alone is safe on
+its own, because file size cannot separate "N patterns plus a 1024-byte
+tail" from "N+1 patterns and no tail": they are the same length.
+
+The disputed *bytes* can, because pattern data has structure and junk does
+not. When the size rule wants more patterns than the order table names,
+inspect the first disputed block — the one at
+`1084 + (max(order_table) + 1) * 1024` — and require every one of its 256
+cells to satisfy both:
+
+- **sample number `<= 31`** (`(b0 & 0xF0) | (b2 >> 4)` encodes 0..=255, but a
+  module has 31 samples), and
+- **period 0, or in `27..=1712`** (`((b0 & 0x0F) << 8) | b1`; 0 means "no
+  note", and the range covers every octave seen in the wild, well beyond
+  ProTracker's own 113..=856).
+
+A block that fails is a tail: clamp the count and keep the surplus verbatim
+in `Module::trailing`, which `encode` appends, so the file still
+round-trips byte-for-byte. A block that passes is a pattern nothing names:
+keep the size-derived count. When the size rule wants no more patterns than
+the table names, nothing is in dispute and it stands unchanged.
+
+The rule is not total and the code says so rather than implying otherwise:
+an all-zero block is byte-for-byte a legal empty pattern, so no parser can
+tell it from zero padding, and it reads as a pattern. That is what the size
+rule did before any cross-check existed, so it is a limit rather than a
+regression.
 
 Each 4-byte note cell decodes as:
 
@@ -1030,13 +1072,16 @@ let param  = b3;
 ```
 
 A repeat length of 1 word or less means "no loop"; store `loop_len = 0`.
-Sample data is signed 8-bit.
+Sample data is signed 8-bit to a mixer, but store it as the raw `u8` bytes
+the file holds and expose the signed view through `data_i8()`; converting at
+parse time is a lossy shape for an editor to round-trip through.
 
 - [ ] **Step 8: Implement `encode` in `src/write.rs`**
 
 The exact inverse. Pad names with NULs to their field widths, write lengths in
 words big-endian, and emit exactly `patterns.len()` patterns — whatever
-Step 7's size-plus-cap rule produced — followed by the sample PCM and then
+Step 7's size-then-inspect-the-disputed-block rule produced — followed by
+the sample PCM and then
 `trailing` verbatim, so the round-trip is byte-identical. Do **not** emit
 `max(order) + 1`: that is the over-counting rule Step 7 rejects, and it
 would write patterns the file never held.
