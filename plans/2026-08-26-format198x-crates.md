@@ -930,8 +930,15 @@ Expected: FAIL — `decode` and `encode` are not written.
 Header layout: 20-byte title; 31 × 30-byte sample headers (22-byte name,
 big-endian length in **words**, finetune, volume, big-endian repeat start and
 repeat length in words); song length at 950; restart at 951; 128 order bytes at
-952; magic at 1080; then `max(orders[..songlen]) + 1` patterns of 1024 bytes;
+952; magic at 1080; then patterns of 1024 bytes each;
 then sample data.
+
+⚠ **Derive the pattern count from `max(...)` over the FULL 128-byte order
+table, not just the first `song_length` entries.** Modules exist whose stored
+pattern data is referenced only by order slots beyond the song length —
+"hidden" patterns. Measured across a 28-module corpus: the song-length rule
+reproduces the exact file size for 24, the full-table rule for all 28. Four
+`Club-Mix 1 (1990)(Beatmaster)` modules carry 1 to 4 such patterns.
 
 Each 4-byte note cell decodes as:
 
