@@ -2,7 +2,9 @@
 
 Documentation for [Play198x](https://github.com/play198x), the 198x family's retro media player/viewer.
 
-Play198x is **not yet started** — no near-term pull — so this repo currently holds design notes and future documentation space.
+Play198x is **started**. The first sub-project — the data-driven core (images
+and tracker music) — is designed and approved; see
+[`specs/`](specs/). Implementation has not begun.
 
 ## Scope (eventually)
 
