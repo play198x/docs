@@ -78,6 +78,26 @@ malformed-input rejection tests. **build198x switches to consuming them**, so
 the extraction is proved by build198x's own suite continuing to pass rather
 than by inspection.
 
+#### Uniform shape, not a shared type
+
+Family members must be able to share these crates and convert between formats
+without N×M code. That is achieved by **convention rather than by a dependency**:
+
+- every image crate exposes `decode(&[u8]) -> Result<T, E>` and
+  `T::to_rgba8(&self) -> (u32, u32, Vec<u8>)`
+- every audio crate yields interleaved frames through the same shape the engine
+  uses
+- errors are typed per crate; none panic
+
+**No `format198x-types` crate, deliberately.** A shared type crate would let the
+compiler enforce the convention, and it was rejected because *dependency-free*
+is the property that makes these crates usable outside the family — the stated
+reason Format198x exists at all. Someone pulling in the ADF crate for their own
+Amiga tool should not inherit a 198x-shaped type system.
+
+The cost is accepted and named: the convention is held by review and by these
+docs, not by the compiler. A crate that breaks the shape will compile.
+
 This applies the family's graduation rule — a format moves to Format198x once
 it has a standalone consumer, the same trigger that moved ADF out of build198x.
 MOD and PowerPacker are authored there directly rather than in Play198x, which
@@ -106,6 +126,23 @@ logic of its own: anything it can do is an operation the core exposes, which is
 what makes a scriptable surface a later addition rather than a retrofit
 (binding decision, clause 7 — reachable from Forge198x with agent-native
 parity).
+
+#### Constraints the core carries for surfaces it does not yet have
+
+Two later surfaces are planned (see **Roadmap**), and both are painful to
+retrofit. `play198x-core` therefore holds these from the first commit, even
+though nothing in this slice exercises them:
+
+- **No global mutable state**, and no assumption of being on a main thread. A
+  thumbnailer runs inside somebody else's process, possibly several at once.
+- **No `panic!` reachable from a decode path.** Unwinding across an FFI boundary
+  is undefined behaviour; the typed-error rule below is therefore not merely
+  good manners.
+- **Cold start is a budget, not an afterthought.** A thumbnailer is spawned per
+  file and must produce a picture quickly; nothing may do lazy global init that
+  assumes a long-lived process.
+- **No assumption that an OS audio device exists** — already required by the
+  engine rule, restated here because three separate surfaces now depend on it.
 
 ### Why egui rather than Tauri
 
@@ -232,6 +269,37 @@ depends on it.
 **The Emu198x packaging question** — whether the chip crates are published and
 independently versioned — gates the code-driven slice and should be raised as
 an Emu198x issue rather than solved here.
+
+## Roadmap
+
+Confirmed direction, each its own spec. Recorded so this slice's architecture is
+judged against where it is going, not only against what it does.
+
+**Code-driven formats — SID, AY, NSF, SAP.** Wanted, and out of scope here only
+because they are blocked. Unblocking is an Emu198x decision about publishing and
+independently versioning the chip crates; until it is taken, no amount of work
+in this repo reaches a `.sid`.
+
+**System preview integration.** A macOS **Quick Look** extension, with
+equivalents on the other platforms. The three want different wrappers over one
+core:
+
+| Platform | Mechanism | Needs |
+|---|---|---|
+| macOS | Quick Look app extension (Swift) | a C-ABI static library to link |
+| Linux | `.thumbnailer` file invoking `cmd %i %o %s` | **a CLI, and nothing else** |
+| Windows | COM in-process DLL (`IThumbnailProvider`) | a C-ABI shared library |
+
+So the work is one `play198x-ffi` crate plus a CLI, not three implementations.
+Linux comes almost free once a CLI exists, which is a reason to expect the CLI
+to be the next surface after the GUI rather than a distant one. The constraints
+this places on the core are listed under **Architecture** and hold from the
+first commit.
+
+**Sharing across the family.** The uniform-shape convention above is what lets
+build198x, Cat198x and Play198x use the same decoders and convert between
+formats. Build198x already encodes these four image formats; the graduated
+crates therefore carry **both** directions, and neither side may drop one.
 
 ## Open questions
 
