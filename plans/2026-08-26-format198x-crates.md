@@ -494,7 +494,8 @@ This task is what proves Tasks 1-3 were faithful. Nothing in build198x's
 behaviour may change.
 
 **Files:**
-- Modify: `Build198x/build198x/crates/build198x/Cargo.toml`
+- Modify: `Build198x/build198x/crates/build198x/Cargo.toml` (and `Cargo.lock`)
+- **Prerequisite:** the four crates must be published to crates.io first.
 - Rewrite: `Build198x/build198x/crates/build198x/src/format/mod.rs` (162 lines → ~30)
 - Delete: `src/format/{scr,koala,art_studio,ilbm}.rs`
 - Delete: `tests/{scr,koala,art_studio,ilbm,netpbm}.rs`
@@ -521,19 +522,22 @@ Note the passing count. That number is the acceptance criterion for Step 7.
 In `crates/build198x/Cargo.toml` under `[dependencies]`:
 
 ```toml
-# The version requirement rides alongside the path, matching the `mediaspec`
-# dependency four lines above: release-plz's cargo-package step refuses a bare
-# path dep, so a path-only entry would break this crate's release. Consumed by
-# path during development; resolves from crates.io once the four are published.
-format-sinclair-zx-spectrum-scr = { path = "../../../../Format198x/format198x/crates/format-sinclair-zx-spectrum-scr", version = "0.1.0" }
-format-commodore-c64-koala = { path = "../../../../Format198x/format198x/crates/format-commodore-c64-koala", version = "0.1.0" }
-format-commodore-c64-art-studio = { path = "../../../../Format198x/format198x/crates/format-commodore-c64-art-studio", version = "0.1.0" }
-format-commodore-amiga-ilbm = { path = "../../../../Format198x/format198x/crates/format-commodore-amiga-ilbm", version = "0.1.0" }
+# Graduated to the format198x org and consumed from crates.io like any external
+# user — the same shape as the ADF crate two lines above. NOT a path dependency:
+# build198x's CI checks out only its own repo, so a path into a sibling checkout
+# resolves locally and fails in CI.
+format-sinclair-zx-spectrum-scr = "0.1.0"
+format-commodore-c64-koala = "0.1.0"
+format-commodore-c64-art-studio = "0.1.0"
+format-commodore-amiga-ilbm = "0.1.0"
 ```
 
-**A bare path dependency here is a release-time failure, not a style choice.**
-The snippet originally omitted `version` and the reviewer caught it; the
-neighbouring `mediaspec` entry already carried the warning.
+⚠ **This task cannot run until the four crates are published.** Publish them
+first (Task 1-3's release), then do this. Two earlier versions of this snippet
+were wrong: a bare path dep, which `release-plz`'s `cargo-package` step refuses,
+and then path-plus-version, which still fails in CI because the sibling repo is
+not checked out. `crates/build198x/Cargo.toml` carried the answer all along in
+its `format-commodore-amiga-adf = "0.2.0"` line.
 
 Verify the relative depth resolves before trusting it:
 
