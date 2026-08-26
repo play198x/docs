@@ -127,6 +127,23 @@ an operation the core exposes, which is what makes a scriptable surface a later
 addition rather than a retrofit (binding decision, clause 7 — reachable from
 Forge198x with agent-native parity).
 
+#### `play198x-core` is published, not internal
+
+**`play198x-core` is `publish = true` and independently versioned from the first
+release**, on Format198x's model rather than Emu198x's.
+
+This is not tidiness. Siblings are told to consume it — Studio198x by
+[`studio198x-authoring.md`](../../../decisions/studio198x-authoring.md) clause
+4, and the same substrate serves a curriculum preview or a Cat198x preview
+surface. A library marked `publish = false` cannot be consumed from another org,
+which is precisely the trap recorded as `emu198x/emu198x#1214`: the chip cores
+Play198x is instructed to reuse are unconsumable, and the instruction has been
+unsatisfiable since it was written. That failure is visible in advance here, so
+it is closed rather than repeated.
+
+The GUI and web shells are **not** published — they are applications, and
+nothing consumes them.
+
 #### Constraints the core carries for surfaces it does not yet have
 
 Two later surfaces are planned (see **Roadmap**), and both are painful to
@@ -328,6 +345,15 @@ first commit.
 build198x, Cat198x and Play198x use the same decoders and convert between
 formats. Build198x already encodes these four image formats; the graduated
 crates therefore carry **both** directions, and neither side may drop one.
+
+**Authoring — Studio198x.** Creating media, as opposed to converting or
+rendering it, was found to be unowned across the family on 2026-08-26 and is now
+allocated to a new sibling
+([`studio198x-authoring.md`](../../../decisions/studio198x-authoring.md)). It is
+not started, but it binds two things here: the format crates stay bidirectional,
+and `play198x-core` is published. A tracker is a module player that can also
+write — most of it is this slice's engine, which is the reason those two
+requirements are cheap now and expensive later.
 
 ## Open questions
 
