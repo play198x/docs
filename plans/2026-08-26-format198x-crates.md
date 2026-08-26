@@ -765,11 +765,67 @@ place the widely-cited community spec is **wrong**.
 - Consumes: nothing.
 - Produces:
   ```rust
+  pub const NUM_SAMPLES: usize = 31;
+  pub const ROWS_PER_PATTERN: usize = 64;
+  pub const CHANNELS: usize = 4;
+  pub const ORDER_TABLE_LEN: usize = 128;
+  pub const MAGIC_OFFSET: usize = 1080;
+  pub const TITLE_LEN: usize = 20;
+  pub const SAMPLE_NAME_LEN: usize = 22;
+  pub const MAGICS: [&[u8; 4]; 7];
+
   pub struct Note { pub sample: u8, pub period: u16, pub effect: u8, pub param: u8 }
+
+  pub struct Sample {
+      pub name_bytes: [u8; SAMPLE_NAME_LEN],
+      pub data: Vec<i8>,
+      pub volume: u8,
+      pub finetune_byte: u8,
+      pub repeat_start_words: u16,
+      pub repeat_length_words: u16,
+  }
+  impl Sample {
+      pub fn name(&self) -> String;      // trimmed at NUL, decoded as ISO-8859-1
+      pub fn finetune(&self) -> i8;      // the signed low nibble
+      pub fn loop_start(&self) -> usize; // bytes
+      pub fn loop_len(&self) -> usize;   // bytes, 0 when not looped
+      pub fn is_looped(&self) -> bool;
+  }
+
+  pub struct Module {
+      pub title_bytes: [u8; TITLE_LEN],
+      pub samples: [Sample; NUM_SAMPLES],
+      pub song_length: u8,
+      pub order_table: [u8; ORDER_TABLE_LEN],
+      pub restart: u8,
+      pub magic: [u8; 4],
+      pub patterns: Vec<[[Note; CHANNELS]; ROWS_PER_PATTERN]>,
+      pub trailing: Vec<u8>,
+  }
+  impl Module {
+      pub fn title(&self) -> String;  // trimmed at NUL, decoded as ISO-8859-1
+      pub fn orders(&self) -> &[u8];  // the played prefix of the order table
+      pub fn channels(&self) -> u8;   // read off the magic
+  }
+
   pub fn decode(bytes: &[u8]) -> Result<Module, DecodeError>;
   pub fn encode(module: &Module) -> Result<Vec<u8>, EncodeError>;
   pub fn is_module(bytes: &[u8]) -> bool;
   ```
+
+  Three shapes in there are worth naming, because each replaced something
+  that looked simpler and was wrong:
+
+  - **Raw bytes and words, with accessors beside them.** `title_bytes` not
+    `title: String`, `order_table` not `orders: Vec<u8>` — see the
+    losslessness warning below.
+  - **`trailing`.** Bytes after the last sample, kept verbatim. Real modules
+    ripped out of executables or padded to a block boundary carry them, and
+    reading them as pattern data shifts every sample's PCM into the junk.
+  - **Fixed-size containers.** `[Sample; NUM_SAMPLES]` and
+    `[[Note; CHANNELS]; ROWS_PER_PATTERN]` make two format invariants
+    compile-time rather than run-time, so `EncodeError` needs no
+    `WrongSampleCount` or `WrongPatternRows`.
 
   ⚠ **`Module` and `Sample` must be LOSSLESS — `encode(decode(x)) == x` for any
   well-formed module.** A first attempt specified `title: String`,
@@ -933,12 +989,36 @@ repeat length in words); song length at 950; restart at 951; 128 order bytes at
 952; magic at 1080; then patterns of 1024 bytes each;
 then sample data.
 
-⚠ **Derive the pattern count from `max(...)` over the FULL 128-byte order
-table, not just the first `song_length` entries.** Modules exist whose stored
-pattern data is referenced only by order slots beyond the song length —
-"hidden" patterns. Measured across a 28-module corpus: the song-length rule
-reproduces the exact file size for 24, the full-table rule for all 28. Four
-`Club-Mix 1 (1990)(Beatmaster)` modules carry 1 to 4 such patterns.
+⚠ **Derive the pattern count from the file's own size, then cap it with the
+order table.** Two earlier rules were tried and both were wrong:
+
+- *The played prefix* (`max` over `order_table[..song_length]`) drops
+  "hidden" patterns — stored pattern data referenced only by order slots
+  beyond the song length. Across a 28-module corpus it reproduced the exact
+  file size for 24 of 28; four `Club-Mix 1 (1990)(Beatmaster)` modules carry
+  1 to 4 such patterns.
+- *The full 128-byte table* (`max` over the whole table) over-counts,
+  because the unplayed tail is also where real files leave non-zero leftover
+  garbage that corresponds to no stored pattern. One real file's garbage
+  byte implied 233 patterns where only 9 were physically present, which
+  reads straight past the end of the file. Nothing in the table itself tells
+  a genuine hidden-pattern index from garbage.
+
+The shipped rule uses the file's own arithmetic. The three regions — the
+1084-byte header, the patterns, and all 31 samples' PCM concatenated — are
+contiguous and exhaustive, so the pattern data is exactly
+`bytes.len() - 1084 - total_sample_bytes`. That was verified evenly
+divisible by 1024 on every file across both corpora, hidden-pattern and
+garbage-tail files included.
+
+The order table then supplies a cap, because the size rule alone assumes
+nothing follows the last sample: `min(size_derived, max(order_table) + 1)`.
+A file with surplus bytes at the end — ripped out of an executable, padded
+to a block boundary — would otherwise read them as extra patterns and take
+its sample PCM from the junk, a misparse that is self-consistent and so
+invisible to any round-trip test. Surplus beyond the cap goes verbatim into
+`Module::trailing`, which `encode` appends, so the file still round-trips
+byte-for-byte.
 
 Each 4-byte note cell decodes as:
 
@@ -955,8 +1035,15 @@ Sample data is signed 8-bit.
 - [ ] **Step 8: Implement `encode` in `src/write.rs`**
 
 The exact inverse. Pad names with NULs to their field widths, write lengths in
-words big-endian, and emit exactly `max(order) + 1` patterns so the round-trip
-is byte-identical.
+words big-endian, and emit exactly `patterns.len()` patterns — whatever
+Step 7's size-plus-cap rule produced — followed by the sample PCM and then
+`trailing` verbatim, so the round-trip is byte-identical. Do **not** emit
+`max(order) + 1`: that is the over-counting rule Step 7 rejects, and it
+would write patterns the file never held.
+
+`encode` also rejects what `decode` rejects — an unrecognised or
+wider-than-4-channel magic, and a song length past the 128-entry order
+table — so bytes it produces can always be read back.
 
 - [ ] **Step 9: Run the tests**
 
