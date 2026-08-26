@@ -521,11 +521,19 @@ Note the passing count. That number is the acceptance criterion for Step 7.
 In `crates/build198x/Cargo.toml` under `[dependencies]`:
 
 ```toml
-format-sinclair-zx-spectrum-scr = { path = "../../../../Format198x/format198x/crates/format-sinclair-zx-spectrum-scr" }
-format-commodore-c64-koala = { path = "../../../../Format198x/format198x/crates/format-commodore-c64-koala" }
-format-commodore-c64-art-studio = { path = "../../../../Format198x/format198x/crates/format-commodore-c64-art-studio" }
-format-commodore-amiga-ilbm = { path = "../../../../Format198x/format198x/crates/format-commodore-amiga-ilbm" }
+# The version requirement rides alongside the path, matching the `mediaspec`
+# dependency four lines above: release-plz's cargo-package step refuses a bare
+# path dep, so a path-only entry would break this crate's release. Consumed by
+# path during development; resolves from crates.io once the four are published.
+format-sinclair-zx-spectrum-scr = { path = "../../../../Format198x/format198x/crates/format-sinclair-zx-spectrum-scr", version = "0.1.0" }
+format-commodore-c64-koala = { path = "../../../../Format198x/format198x/crates/format-commodore-c64-koala", version = "0.1.0" }
+format-commodore-c64-art-studio = { path = "../../../../Format198x/format198x/crates/format-commodore-c64-art-studio", version = "0.1.0" }
+format-commodore-amiga-ilbm = { path = "../../../../Format198x/format198x/crates/format-commodore-amiga-ilbm", version = "0.1.0" }
 ```
+
+**A bare path dependency here is a release-time failure, not a style choice.**
+The snippet originally omitted `version` and the reviewer caught it; the
+neighbouring `mediaspec` entry already carried the warning.
 
 Verify the relative depth resolves before trusting it:
 
