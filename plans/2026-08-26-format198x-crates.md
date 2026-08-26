@@ -765,15 +765,24 @@ place the widely-cited community spec is **wrong**.
 - Consumes: nothing.
 - Produces:
   ```rust
-  pub struct Sample { pub name: String, pub data: Vec<i8>, pub volume: u8,
-                      pub finetune: i8, pub loop_start: usize, pub loop_len: usize }
   pub struct Note { pub sample: u8, pub period: u16, pub effect: u8, pub param: u8 }
-  pub struct Module { pub title: String, pub samples: Vec<Sample>,
-                      pub orders: Vec<u8>, pub patterns: Vec<Vec<[Note; 4]>> }
   pub fn decode(bytes: &[u8]) -> Result<Module, DecodeError>;
   pub fn encode(module: &Module) -> Result<Vec<u8>, EncodeError>;
   pub fn is_module(bytes: &[u8]) -> bool;
   ```
+
+  ⚠ **`Module` and `Sample` must be LOSSLESS — `encode(decode(x)) == x` for any
+  well-formed module.** A first attempt specified `title: String`,
+  `name: String` and `orders: Vec<u8>` truncated to song length, and **0 of 17
+  real modules round-tripped**. The format carries bytes those shapes discard:
+  the restart byte at offset 951, the magic variant, order-table entries beyond
+  song length (verified nonzero in real files), bytes after a name's NUL, the
+  one-word no-loop ambiguity, and unused finetune bits.
+
+  This is not pedantry. `studio198x-authoring.md` has Studio198x consuming these
+  crates to *author* media, and an editor that cannot re-emit what it parsed
+  corrupts every file it saves. Keep a trimmed-`&str` accessor for ergonomics,
+  but never as the only representation.
   **This crate parses and writes only. It does not play** — the mixer is
   `play198x-core`'s engine, per the spec's separation of format from playback.
 
