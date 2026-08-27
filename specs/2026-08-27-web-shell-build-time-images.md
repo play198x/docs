@@ -106,11 +106,27 @@ verified rather than reviewed:
 
 1. **Round trip.** Inflate the emitted IDAT and assert it equals the exact
    scanlines fed in, byte for byte. Uses `node:zlib` alone.
-2. **Fixture.** One byte-for-byte comparison against a known-good PNG, checked
-   in, which catches header mistakes the round trip cannot see.
+2. **Structure.** Assert the signature, every IHDR field, and each chunk's CRC
+   against `node:zlib`'s own `crc32` rather than one we compute.
+3. **An independent decoder.** A real browser decodes the emitted PNG and its
+   readback is compared against the decoder's RGBA — **every byte**, not a
+   sample — with the first differing pixel reported by coordinate and both
+   values. This runs in CI, not only on a developer's machine.
 
-The round trip alone would pass on a file with a wrong bit depth or colour type.
-Both checks are required.
+The round trip alone would pass on a file with a wrong bit depth or colour type,
+so it is never the only check.
+
+**Why the third replaced a checked-in fixture.** This originally asked for a
+byte-for-byte comparison against a known-good PNG. That is circular when the
+fixture is produced by the encoder it checks: it detects change, not
+correctness. Checks 1 and 2 are self-referential in the same way — the CRC test
+uses the very `crc32` the encoder called, and the round trip is `deflateSync`
+verified by `inflateSync`.
+
+Chromium shares no code with any of it. It is the only check here that can catch
+an encoder bug the others have a common blind spot for, which is precisely why
+it has to run where a regression would be caught rather than where someone
+happens to run it.
 
 ## The component
 
@@ -226,7 +242,7 @@ resolution rule in one function, not a change to anything here.
 
 ## The website build gains Rust
 
-`deploy.yml` adds a checkout of `play198x/play198x`, a Rust toolchain with the
+`ci.yml` adds a checkout of `play198x/play198x`, a Rust toolchain with the
 `wasm32-unknown-unknown` target, `wasm-pack`, and a `wasm-pack build --target
 nodejs` step before `npm run build`. This follows the pattern the workflow
 already uses for `code-samples`.
@@ -235,6 +251,27 @@ already uses for `code-samples`.
 so a Rust build failure would block a content drip. The build must therefore
 cache the Rust toolchain and the wasm artifact, and the wasm step must run
 before `npm run build` so a failure is attributed clearly.
+
+**`deploy.yml` does not get this block until a page uses the component.**
+
+This paragraph originally required it in `deploy.yml` too. That was priced
+against a *working* feature — but nothing imports `NativeImage.astro` on the
+slice that builds it, so Astro never compiles the component and never reads the
+wasm. As written, the daily unattended publish would have gained a third-repo
+checkout, a toolchain install, a `wasm-pack` install and an uncached ~10 MB
+binaryen download, in exchange for **no change to `dist/` at all** — four new
+ways to stall a content drip, six weeks before the CRASH! Live soft launch.
+
+So the cost lands where it is paid for: in `ci.yml` from the start, where it
+gates every pull request and a failure costs only a red PR; in `deploy.yml` from
+the pull request that first puts a `<NativeImage>` on a page. That PR reinstates
+the block **and** the unit-test step, which is what stops a renamed wasm getter
+reaching a scheduled publish as `<img width="NaN">`.
+
+**Merge order is load-bearing.** `scripts/build-wasm.mjs` builds a crate path
+that exists only once the `play198x` side has landed, and it is not conditional.
+Merge `play198x` first and confirm its CI is green; merging the website first
+turns every run red, including on days nobody touches either repo.
 
 **Verify the module shape before writing the loader.** `wasm-pack --target
 nodejs` emits CommonJS glue while Astro frontmatter is ESM. The first
