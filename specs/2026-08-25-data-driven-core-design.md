@@ -141,8 +141,17 @@ Play198x is instructed to reuse are unconsumable, and the instruction has been
 unsatisfiable since it was written. That failure is visible in advance here, so
 it is closed rather than repeated.
 
-The GUI and web shells are **not** published — they are applications, and
-nothing consumes them.
+The GUI and web shells are **not** published, because their public surfaces have
+no Rust caller: `play198x-gui` is a binary, and `play198x-web` exposes
+`#[wasm_bindgen]` functions returning JavaScript values. Anything native that
+wants decoding uses `play198x-core`.
+
+This originally read "they are applications, and nothing consumes them". That
+stopped being true of `play198x-web`, which is a library consumed by the
+Code198x website — from another org, the shape flagged two paragraphs above. The
+conclusion survives on the reason given here; the distribution question it
+raises, including when to publish the built wasm to npm, is answered in
+[`2026-08-27-web-shell-build-time-images.md`](2026-08-27-web-shell-build-time-images.md).
 
 #### Constraints the core carries for surfaces it does not yet have
 
