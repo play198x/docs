@@ -463,7 +463,25 @@ git commit -m "feat: play a module through the wasm boundary"
 - Create: `src/scripts/audio.ts`
 - Modify: `src/scripts/player.ts`, `src/components/Player.astro`
 
-Implement the shape Task 1 recommended. **Nothing outside `audio.ts` knows how audio works** — if the shape has to change, one file changes.
+Implement the shape Task 1 recommended: **wasm instantiated inside the
+`AudioWorkletProcessor`**, with its own memory, rendering on the audio thread.
+48 kHz; the buffer is 128 samples, fixed by the Web Audio spec.
+
+**Nothing outside `audio.ts` knows how audio works** — if the shape has to
+change, one file changes.
+
+**Do not `postMessage` a compiled `WebAssembly.Module` to the worklet's port.**
+Task 1 measured this failing **silently** in Chrome 151 — no exception, no error
+event, the message simply never arrives — and confirmed by control that the same
+Module transfers fine to a plain `Worker`, so it is specific to the worklet port.
+Transfer the raw `ArrayBuffer` and call `WebAssembly.instantiate(bytes, {})`
+inside the worklet instead. That keeps the private memory and the audio-thread
+rendering the shape was chosen for.
+
+**Smoke-test Safari and Firefox before calling this done.** The spike covered
+Chrome only, and a silent per-engine failure is this shape's demonstrated risk.
+If another engine fails the same way, say so rather than working around it
+blindly — the fallback shapes are in Task 1's report.
 
 - [ ] **Step 1: Start on a gesture, and say so before it**
 
