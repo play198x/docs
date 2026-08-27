@@ -180,21 +180,34 @@ site in October is not.
 Beside the code that produces them, in `code198x/code-samples`, which
 `deploy.yml` already checks out and passes as `CODE_SAMPLES_PATH`.
 
-The first consumer already exists, and it shows the problem this solves:
+The first consumer already exists:
 
 ```
 code-samples/sinclair-zx-spectrum/assembly/gloaming/loading-screen/
-    compose.py
-    gloaming.scr           6912 bytes — a SCREEN$, the real artifact
-    loading-screen.png     2174 bytes — a hand-made copy of it
+    compose.py             the generator — source of truth
+    loading-screen.png     2174 bytes — its output, a 256×192 constrained image
+    gloaming.scr           6912 bytes — the SCREEN$, converted from the PNG
     README.md
 ```
 
-`loading-screen.png` is a second rendering of the same picture, maintained by
-hand beside the first. Nothing keeps the two in step: change `compose.py` and
-the `.scr` moves while the `.png` does not, and the page goes on showing the old
-one with nothing to say it is stale. `NativeImage` decodes `gloaming.scr`
-directly, and the duplicate stops existing.
+**Note the direction.** The PNG is the *source* and the `.scr` is derived from
+it by `build198x image`; the README documents the regeneration command, and for
+this file the conversion is lossless — `mean_error 0.0`, the tool reporting
+*"input appears already constrained."* These two are not a drifting duplicate,
+and nothing here is deleted.
+
+What `NativeImage` changes is which of them a page shows. Today a figure would
+show `loading-screen.png`: the artwork before conversion. `NativeImage` shows
+`gloaming.scr` — **the 6912 bytes the tape actually carries**, decoded by the
+decoder the player uses. On this file the two images match, so the difference
+costs nothing; on any file where the conversion is not lossless, the page stops
+quietly showing the pre-conversion source in place of the shipped artifact.
+
+The general case is the stronger one. Most machine files are authored directly
+and have no PNG beside them, so a figure of one today means producing and
+committing a rendering by hand. This removes that step, and with it the class of
+staleness where the rendering and the artifact drift apart with nothing to say
+which is current.
 
 The 2,174-byte PNG also calibrates the budget above: a real Spectrum screen
 lands two orders of magnitude inside 96 KiB.
