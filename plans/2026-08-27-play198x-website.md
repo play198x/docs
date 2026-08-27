@@ -25,9 +25,31 @@
 
 ## Two decisions to make before Task 2
 
-**1. npm — the trigger I recorded has fired.** `2026-08-27-web-shell-build-time-images.md` defers publishing the built wasm to npm until *"a second consumer appears"*. This site is that second consumer: two Astro sites would each check out `play198x/play198x` and run a Rust toolchain to build the identical artefact.
+**1. npm — resolved 2026-08-27. `@play198x/web` is published.**
 
-**Recommendation: publish `@play198x/web` to npm**, and have both sites `npm install` it. It removes Rust from both site builds, it is what `wasm-pack` targets natively, and honouring a trigger you wrote down is the whole point of writing it down. **Establishing an npm org is an ask-first action** — Steve rules on this, and Task 2 is written so either answer costs the same: the wasm arrives through one script, and swapping its innards is one step.
+The trigger recorded in `2026-08-27-web-shell-build-time-images.md` — *publish when
+a second consumer appears* — fired when this site became that consumer, and the
+package now exists: [`@play198x/web`](https://www.npmjs.com/package/@play198x/web)
+0.1.0, 24.5 kB, published from `play198x/play198x`.
+
+**Task 3 therefore takes branch 1a**, and 1b is dead. The site adds a dependency
+and copies files; **no Rust toolchain enters this repository's build at all.**
+
+Two consequences for later tasks:
+
+- Publishing is now **secretless and token-proof**. The package is set to
+  *require 2FA and disallow tokens*, so publish authority flows only through
+  `npm.yml` on a `play198x-web-v*` tag. Nobody can publish this package from a
+  laptop, including you.
+- **0.1.0 carries no provenance attestation**, because the bootstrap publish had
+  to use a token. The next release will have one. That is a visible difference on
+  the package page and is the cheapest proof that the trusted publisher is
+  actually being used rather than silently failing over to something else.
+
+**The published 0.1.0 has `probe` and `decode_image` only.** `ModulePlayer`
+(Task 7) and `open_container`/`read_entry` (Task 6) do not exist in it yet, so
+each of those tasks ends with a version bump and a tag, and the site's dependency
+moves with it.
 
 **2. The audio approach is unproven and Task 1 settles it.** The spec names WebAudio through `web-sys` and flags it as the least-proven part, to be spiked *before the page is built around it*, so that failure degrades the site to images-only rather than sinking it. Task 1 is that spike. **Tasks 7 and 8 must not begin until it reports.**
 
