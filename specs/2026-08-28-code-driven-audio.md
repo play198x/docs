@@ -56,9 +56,19 @@ C64 BASIC flag, the one case rejectable without running anything.
 
 ## Scope
 
-**Slice 1 — `.ay`.** ROM-free by construction: the format's player is a stub,
-not the Spectrum ROM. Smallest host, no licence decision, and 696 `.ay.zip`
-archives already on the Time Capsule to test against.
+**Slice 1 — `.ay`, including the beeper.** ROM-free by construction: the
+format's player is a stub, not the Spectrum ROM. Smallest host, no licence
+decision, and 696 `.ay.zip` archives already on the Time Capsule to test
+against.
+
+**The beeper is in this slice and was nearly left out.** `.ay` wraps Z80 code
+that plays *either* the AY chip *or* the Spectrum's 1-bit speaker — player
+version 3 of the format exists to add beeper support — so 1-bit tunes ride in
+the same container. A host that decodes only the AY ports would run a beeper
+tune perfectly and render silence: a tune that appears to work and makes no
+sound, which is the failure mode this project keeps designing out. The beeper
+is bit 4 of any write to port `$FE`, and rendering it is sampling that bit over
+time.
 
 **Slice 2 — `.sid`, PSID with a play address.** ~93% of HVSC by header, of
 which ~89% needs no ROM. The host drives: call `init` once, call `play` per
@@ -155,10 +165,17 @@ lands as `play198x-core` 0.2.0.
 
 1. Parse: header, song table, block list, player version.
 2. Load each block at its stated address into 64KB of RAM.
-3. Install the stub: fill `$0000-$00FF` with `RET`, supply the init routine and
-   the interrupt handler, honour IM1/IM2 per the player version.
-4. Run the Z80 via `bus_request`, raising an interrupt at the tune's rate.
-5. Clock `emu198x-gi-ay-3-8910`; drain samples into the engine's mixer.
+3. Install the stub: fill `$0000-$00FF` with `RET`, and set SP and the
+   register pairs from the song's `points` and `LoReg`/`HiReg`.
+4. Run the Z80 via `bus_request`, **calling** the tune's interrupt routine at
+   its rate rather than raising a real `INT`. The format's `points` structure
+   hands the player an interrupt address to call, so this needs no IM1/IM2
+   vector modelling on a host with no interrupting hardware. A tune that
+   installs its own handler and expects a real interrupt is out of slice 1;
+   the corpus sweep will say how many those are.
+5. Decode port writes: `$FFFD`/`$BFFD` to `emu198x-gi-ay-3-8910`, `$FE` bit 4
+   to the speaker. Clock the chip, sample the speaker, mix both into the
+   engine's frame buffer.
 
 ### `.sid`
 
