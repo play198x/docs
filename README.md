@@ -14,6 +14,6 @@ and tracker music) — is designed and approved; see
 
 ## Not here
 
-- The decision to pursue Play198x and its boundaries — the umbrella decision record [`../../decisions/play198x-media-player.md`](../../decisions/play198x-media-player.md).
+- The decision to pursue Play198x and its boundaries — the umbrella decision record `198x/decisions/play198x-media-player.md`.
 - Whole-machine emulation and the chip cores it reuses — Emu198x.
 - Hardware facts — the umbrella `reference/` library.
