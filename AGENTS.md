@@ -1,6 +1,6 @@
 # Play198x docs
 
-> Read [`PRINCIPLES.md`](PRINCIPLES.md) first.
+> Read [`PRINCIPLES.md`](PRINCIPLES.md) first. [`MANIFESTO.md`](MANIFESTO.md) is why the project exists.
 
 Documentation repo for Play198x. Part of the `play198x` org container; see
 [`../AGENTS.md`](../AGENTS.md) for the org layout and [`../../AGENTS.md`](../../AGENTS.md)
