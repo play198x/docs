@@ -8,9 +8,11 @@ for the 198x umbrella.
 
 Play198x is **building**. The data-driven core is designed in
 [`specs/`](specs/), planned in [`plans/`](plans/), and implemented — it probes a
-file, decodes the four image formats to RGBA, and plays a ProTracker module.
-Not yet published to crates.io. Read the specs before proposing changes to
-scope or architecture.
+file, decodes the four image formats to RGBA, plays a ProTracker module, and
+plays ZX Spectrum `.ay` tunes behind an optional `ay` feature by running the
+tune's own Z80 against Emu198x's published chip crates, with no ROM.
+`play198x-core` is published on crates.io. Read the specs before proposing
+changes to scope or architecture.
 
 ## Not here
 
