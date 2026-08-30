@@ -115,6 +115,64 @@ the core's existing `Metadata` enum stays the thing that says which is which.
 The rule the rest of this slice follows: **standardise where the operations
 are the same; keep separate where the data is different.**
 
+### How SID and the rest fit
+
+`.ay` is the first of several, so the seam is built for the family rather
+than for this format. Sorting what is coming by *how it produces audio*, not
+by machine, gives three groups and only three:
+
+| Family | Examples | How it renders |
+|---|---|---|
+| Self-timing | ProTracker, and other tracker engines | `render(n)` directly; the engine keeps its own clock |
+| Frame-driven code | **`.ay`**, SID, NSF, SAP | a CPU runs a routine per frame, then the chip is drained |
+| Frame-driven data | YM, VGM | a register dump is applied per frame; no CPU at all |
+
+The second and third rows differ only in what happens inside a frame. Both
+produce a fixed lump of samples and both meet a worklet asking for 128. So
+the reconciliation is not an `.ay` problem, and it does not belong inside
+`AyPlayer`:
+
+```rust
+/// Something that produces audio exactly one frame at a time.
+pub trait FrameSource {
+    /// Advance one frame — run the tune's routine, or apply the next dump.
+    fn frame(&mut self);
+    /// Fill one frame's worth of interleaved stereo.
+    fn render_frame(&mut self, out: &mut [f32]) -> usize;
+    /// Samples this frame will produce. Asked after each `frame()`, not
+    /// once: a SID driven by a CIA timer does not run at a fixed rate, and
+    /// a fixed answer here is what would force that format to be special.
+    fn samples_per_frame(&self) -> usize;
+}
+```
+
+`FramePump<S: FrameSource>` holds the ring buffer and implements `Player`.
+`AyPlayer` implements `FrameSource` and gets the quantum reconciliation for
+free — and, more to the point, gets the *tested* seam for free, which is
+where 50 Hz clicks come from. SID, NSF and SAP implement the same trait and
+inherit both.
+
+This slice builds `FrameSource`, `FramePump` and one implementation. It does
+not build a second: the generalisation is justified by SID being the next
+scheduled slice and by the register-stream formats sharing the same shape,
+not by a hypothetical.
+
+### One position for every frame-driven format
+
+`Position` therefore does not grow a variant per format:
+
+```rust
+pub enum Position {
+    Module { order: usize, pattern: usize, row: usize, tick: u8 },
+    Frame  { song: usize, frame: u32 },
+}
+```
+
+Every frame-driven format reports `Frame`. Which format it *is* comes from
+`probe` and the metadata, which already say so — repeating it in the position
+would be a second place for the same fact to be stated and to drift. Adding
+SID changes this enum not at all.
+
 ### Subtunes
 
 A `.ay` carries a table of songs: **278 of the 696 local archive files are
