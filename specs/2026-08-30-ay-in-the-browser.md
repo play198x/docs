@@ -87,13 +87,33 @@ pub enum Position {
 
 ### One type crosses the boundary
 
-`play198x-web` exports a single `Player` class wrapping an enum, so the
-worklet constructs one thing and calls one set of methods. `ModulePlayer`
-stays as it is for now — it is published, the site uses it, and breaking it is
-a separate decision from adding a second format.
+`play198x-web` exports **one** `Player` class wrapping an enum, and
+`ModulePlayer` is removed rather than left beside it. It takes bytes, a song
+index and a sample rate, probes the bytes, and constructs whichever player the
+format calls for.
 
-The new class takes bytes, a song index and a sample rate, probes the bytes,
-and constructs whichever player the format calls for.
+Removing a published export is a breaking change, and it is the right one to
+take now. `@play198x/web` is a 0.x package, and `play198x.github.io` is its
+only consumer anywhere — checked across the family, not assumed — and this
+slice edits that site regardless. Keeping `ModulePlayer` alongside a class
+that subsumes it would buy compatibility nobody needs and leave every future
+format deciding which of two players to extend. `@play198x/web` goes to 0.2.0.
+
+### Where standardising stops
+
+Two players become one because the *operations* are the same: fill `n` frames
+of stereo, play or pause, report a position. That is a real shared contract
+and a single type states it honestly.
+
+The metadata does not follow, and should not. A module has 31 sample names,
+patterns and orders; an `.ay` has an author, a misc string and a song table.
+Merging them produces a type whose fields are mostly empty depending on what
+was loaded — the same defect this design rejects for the panel, moved into the
+API where it is harder to see. `ModuleMeta` and `AyMeta` stay separate, and
+the core's existing `Metadata` enum stays the thing that says which is which.
+
+The rule the rest of this slice follows: **standardise where the operations
+are the same; keep separate where the data is different.**
 
 ### Subtunes
 
@@ -152,8 +172,5 @@ Named, as everywhere else here.
 
 ## Open questions
 
-- **Whether `ModulePlayer` eventually folds into the new class.** Two exported
-  players is one more than the spec wanted. Worth doing once the new one has
-  proven itself, and a breaking change to a published crate either way.
 - **What the panel shows while a tune is fading.** `.ay` songs declare a fade
   length as well as a play length; nothing uses it yet.
