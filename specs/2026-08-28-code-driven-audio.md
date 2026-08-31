@@ -4,8 +4,10 @@
 2026-08-31 in [play198x/play198x#38](https://github.com/play198x/play198x/issues/38).
 The open-ROM decision is settled by
 [`open-roms-do-not-extend-callable-sid-playback.md`](https://github.com/play198x/play198x/blob/main/decisions/open-roms-do-not-extend-callable-sid-playback.md):
-replacement ROMs do not extend callable playback. Self-driven SID work remains
-in [#39](https://github.com/play198x/play198x/issues/39).
+replacement ROMs do not extend callable playback. The
+[self-driven SID decision](https://github.com/play198x/play198x/blob/main/decisions/self-driven-sid-belongs-to-a-c64-emulator.md)
+assigns RSID and zero-play-address PSID to Emu198x because their continuously
+scheduled C64 hardware crosses the host-not-machine boundary.
 
 **Binding decision:** [`play198x-media-player.md`](../../../decisions/play198x-media-player.md)
 (umbrella), and its thin-consumer rule in particular: Play198x consumes
@@ -84,9 +86,11 @@ time.
 by header, of which ~89% needs no ROM. The host drives: call `init` once, call
 `play` per frame.
 
-**Not in this spec.** RSID and the 111 self-driven PSIDs, which install their
-own interrupt handlers and expect a power-on machine; open ROMs; NSF, SAP and
-other code-driven formats; any desktop shell work.
+**Not in Play198x.** RSID and the 111 self-driven PSIDs install their own
+interrupt handlers and require a continuously scheduled C64 machine; the
+[decision](https://github.com/play198x/play198x/blob/main/decisions/self-driven-sid-belongs-to-a-c64-emulator.md)
+assigns them to Emu198x. Also outside this spec: NSF, SAP and other code-driven
+formats, and any desktop shell work.
 
 **Never.** Shipping Commodore or Sinclair ROMs, or requiring a visitor to
 supply one. Booting a machine — that is Emu198x's job, and the boundary in the
