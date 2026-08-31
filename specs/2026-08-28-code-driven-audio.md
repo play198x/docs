@@ -1,7 +1,7 @@
 # Play198x code-driven audio — design
 
-**Status:** AY slice implemented 2026-08-30; ROM-free PSID remains planned in
-[play198x/play198x#38](https://github.com/play198x/play198x/issues/38).
+**Status:** AY slice implemented 2026-08-30; ROM-free callable PSID implemented
+2026-08-31 in [play198x/play198x#38](https://github.com/play198x/play198x/issues/38).
 Open-ROM and self-driven SID work were split into
 [#37](https://github.com/play198x/play198x/issues/37) and
 [#39](https://github.com/play198x/play198x/issues/39) respectively.
@@ -79,7 +79,7 @@ sound, which is the failure mode this project keeps designing out. The beeper
 is bit 4 of any write to port `$FE`, and rendering it is sampling that bit over
 time.
 
-**Slice 2 — `.sid`, PSID with a play address (planned in #38).** ~93% of HVSC
+**Slice 2 — `.sid`, PSID with a play address (implemented in #38).** ~93% of HVSC
 by header, of which ~89% needs no ROM. The host drives: call `init` once, call
 `play` per frame.
 
@@ -108,7 +108,7 @@ right constraint for a media player.
 ### Where it lives
 
 `play198x-core` uses optional features for code-driven audio, off by default.
-The `ay` feature exists today; #38 proposes the corresponding `sid` feature.
+The `ay` and `sid` features exist today; each acquires only its own CPU/chip pair.
 
 This is the boring answer and it is chosen deliberately. `play198x-core` is
 published and today has no emulation dependencies; a consumer decoding SCREEN$
@@ -187,6 +187,10 @@ replaced `ModulePlayer`.
 
 ### `.sid`
 
+The header fields and PSID environment below follow HVSC's canonical
+[`SID_file_format.txt`](https://www.hvsc.c64.org/download/C64Music/DOCUMENTS/SID_file_format.txt),
+the copy distributed with HVSC #85 as well as published by the project.
+
 1. Parse: PSID/RSID header, v2NG fields, data blocks.
 2. Load at `loadAddress`, or the first two bytes of the body when it is zero.
 3. Establish the spec's default PSID environment: `$02A6` from the PAL/NTSC
@@ -200,14 +204,15 @@ drives for ProTracker, so the web shell's audio path does not change shape.
 
 ## Testing
 
-**The correctness bar is differential, and it is the largest item in this
-spec.** The ProTracker engine is trustworthy because it was verified against
+**The correctness bar is differential.** The ProTracker engine is trustworthy because it was verified against
 the replayer source with a differential harness; a SID player asserted correct
 by its author is worth nothing. Slice 2 is not done until its output is
 compared against a reference player over a corpus.
 
-- **Differential**: `.sid` still requires comparison against sidplayfp in
-  #38. AY has extensive constructed-fixture and full-corpus coverage, but no
+- **Differential**: `.sid` is compared against sidplayfp over a two-second
+  real HVSC tune. Both render 96,000 audible samples; their 20 ms energy
+  envelopes correlate at 0.877. The envelope is the gate because different
+  SID filter models do not promise sample identity. AY has extensive constructed-fixture and full-corpus coverage, but no
   retained reference-player differential harness; do not rewrite that as a
   completed claim.
 - **Corpora, both already local**: 696 `.ay.zip` archives under
@@ -235,9 +240,10 @@ family applies to gates.
 
 ## Open questions
 
-- **Bundle size (answered for AY).** The shipped AY feature adds 37.7 KiB raw
-  and 13.6 KiB gzipped. SID must be measured independently in #38 rather than
-  inheriting AY's answer.
+- **Bundle size (answered).** AY adds 37.7 KiB raw and 13.6 KiB gzipped. SID,
+  measured 2026-08-31 from otherwise identical release wasm builds, adds
+  44,598 bytes raw and 18,548 bytes gzipped (320,397/145,025 with SID versus
+  275,799/126,477 without).
 - **Where the parsers live.** `.ay` parsing started here and has no second
   consumer, so it has not graduated. #38 must make the same deliberate choice
   for `.sid`; either location remains subject to the Format198x graduation
