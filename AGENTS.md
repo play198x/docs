@@ -9,8 +9,12 @@ for the 198x umbrella.
 Play198x is **building**. The data-driven core is designed in
 [`specs/`](specs/), planned in [`plans/`](plans/), and implemented — it probes a
 file, decodes the four image formats to RGBA, plays a ProTracker module, and
-plays ZX Spectrum `.ay` tunes behind an optional `ay` feature by running the
-tune's own Z80 against Emu198x's published chip crates, with no ROM.
+plays ZX Spectrum `.ay` and ROM-free callable PSID tunes behind separate
+optional features. Their own Z80 or 6502 code runs against Emu198x's published
+CPU and sound-chip crates on deliberately small hosts; neither ships a ROM.
+RSID and zero-play-address PSID belong to Emu198x because they require a
+continuously scheduled C64 machine. ROM-dependent and multi-SID tunes are
+identified and explicitly declined.
 `play198x-core` is published on crates.io. Read the specs before proposing
 changes to scope or architecture.
 

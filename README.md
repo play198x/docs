@@ -2,12 +2,13 @@
 
 Documentation for [Play198x](https://github.com/play198x), the 198x family's retro media player/viewer.
 
-Play198x is **building**. The first sub-project — the data-driven core (images
-and tracker music) — is designed, approved and implemented: `play198x-core` is
-on crates.io, `@play198x/web` is on npm, and
-[play198x.github.io](https://play198x.github.io) plays what you drop on it. The
-second — code-driven audio, meaning `.ay` and `.sid`, which are programs rather
-than data — is specified and awaiting review. See [`specs/`](specs/).
+Play198x is **building**. The data-driven core and its code-driven audio hosts
+are implemented: `play198x-core` is on crates.io, `@play198x/web` is on npm,
+and [play198x.github.io](https://play198x.github.io) plays what you drop on it.
+Today that means four still-image formats, ProTracker MOD, ZX Spectrum `.ay`,
+and ROM-free callable PSID. RSID, self-driven PSID, multi-SID and tunes that
+read mapped C64 ROMs are identified and explicitly declined. See
+[`specs/`](specs/) for the design and measured boundaries.
 
 ## Scope (eventually)
 
