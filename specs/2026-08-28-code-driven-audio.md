@@ -1,6 +1,10 @@
 # Play198x code-driven audio — design
 
-**Status:** Draft 2026-08-28, awaiting review.
+**Status:** AY slice implemented 2026-08-30; ROM-free PSID remains planned in
+[play198x/play198x#38](https://github.com/play198x/play198x/issues/38).
+Open-ROM and self-driven SID work were split into
+[#37](https://github.com/play198x/play198x/issues/37) and
+[#39](https://github.com/play198x/play198x/issues/39) respectively.
 
 **Binding decision:** [`play198x-media-player.md`](../../../decisions/play198x-media-player.md)
 (umbrella), and its thin-consumer rule in particular: Play198x consumes
@@ -10,9 +14,14 @@ Emu198x's chip and CPU cores and never reimplements them.
 which drew the fault line this spec crosses. That spec put SID and `.ay` in a
 "code-driven — blocked" row. They are no longer blocked.
 
-**Goal:** play `.ay` and `.sid` by running each tune's own code against
-Emu198x's published CPU and chip crates, on a host Play198x supplies — and
-**without shipping ROMs**.
+**Goal:** establish how `.ay` and `.sid` play by running each tune's own code
+against Emu198x's published CPU and chip crates, on a host Play198x supplies —
+and **without shipping ROMs**.
+
+The AY half of that goal now ships in the core and browser. The SID half is a
+plan, not a statement of current support; its research history and corpus
+measurements remain in
+[play198x/play198x#22](https://github.com/play198x/play198x/issues/22).
 
 ---
 
@@ -56,7 +65,7 @@ C64 BASIC flag, the one case rejectable without running anything.
 
 ## Scope
 
-**Slice 1 — `.ay`, including the beeper.** ROM-free by construction: the
+**Slice 1 — `.ay`, including the beeper (implemented).** ROM-free by construction: the
 format's player is a stub, not the Spectrum ROM. Smallest host, no licence
 decision, and 696 `.ay.zip` archives already on the Time Capsule to test
 against.
@@ -70,9 +79,9 @@ sound, which is the failure mode this project keeps designing out. The beeper
 is bit 4 of any write to port `$FE`, and rendering it is sampling that bit over
 time.
 
-**Slice 2 — `.sid`, PSID with a play address.** ~93% of HVSC by header, of
-which ~89% needs no ROM. The host drives: call `init` once, call `play` per
-frame.
+**Slice 2 — `.sid`, PSID with a play address (planned in #38).** ~93% of HVSC
+by header, of which ~89% needs no ROM. The host drives: call `init` once, call
+`play` per frame.
 
 **Not in this spec.** RSID and the 111 self-driven PSIDs, which install their
 own interrupt handlers and expect a power-on machine; open ROMs; NSF, SAP and
@@ -98,8 +107,8 @@ right constraint for a media player.
 
 ### Where it lives
 
-`play198x-core` gains two **optional features**, `ay` and `sid`, both off by
-default.
+`play198x-core` uses optional features for code-driven audio, off by default.
+The `ay` feature exists today; #38 proposes the corresponding `sid` feature.
 
 This is the boring answer and it is chosen deliberately. `play198x-core` is
 published and today has no emulation dependencies; a consumer decoding SCREEN$
@@ -141,23 +150,22 @@ never a dependency.
 
 ### Reaching the existing surface
 
-`probe()` gains `Format::Ay` and `Format::Sid`.
+`probe()` gained `Format::Ay`. `Format::Sid` belongs to #38.
 
-**`ModulePlayer` is ProTracker-shaped and cannot absorb these.** It exposes
-order, pattern, row and tick; a SID has none of them. The proposal is a
-`Player` trait in the core — `render`, `set_playing`, `seek`, and a
-format-specific position — with `ModulePlayer` as one implementation, and a
-single enum wrapper crossing the wasm boundary so `play198x-web` still exports
-one type.
+**The shared player seam is implemented.** The core now has a `Player` trait
+with `render`, `set_playing` and a format-shaped `Position`; seeking remains a
+module-only operation rather than a trait method every frame-driven player
+would have to refuse. `FrameSource` and `FramePump` reconcile fixed hardware
+frames with arbitrary render requests. The wasm package exports one `Player`
+class wrapping modules and AY, ready for SID to add another inner variant.
 
-**`Metadata` needs a breaking change, and it should be taken deliberately.**
-Its own documentation says adding a *kind* of work is not routine, precisely so
-that consumers are forced to decide. A SID is still something you listen to, so
-this is a new shape within audio rather than a new kind — but `ModuleMeta`
-carries patterns, orders, sample names and channels-from-magic, none of which a
-SID has. Adding `Metadata::Sid` and `Metadata::Ay` variants breaks every
-existing match, which is the point of the enum not being `non_exhaustive`. This
-lands as `play198x-core` 0.2.0.
+**Metadata took the deliberate breaking change.** `Metadata::Ay(AyMeta)` now
+sits beside `Metadata::Module(ModuleMeta)`, and the wasm boundary exposes
+`AyMeta` separately because author, misc text and a song table are not tracker
+patterns, orders and samples. SID still needs its own metadata decision in
+[#38](https://github.com/play198x/play198x/issues/38). The released core is
+0.4.0; the browser package moved to 0.2.0 when its one `Player` boundary
+replaced `ModulePlayer`.
 
 ## Data flow
 
@@ -198,8 +206,10 @@ the replayer source with a differential harness; a SID player asserted correct
 by its author is worth nothing. Slice 2 is not done until its output is
 compared against a reference player over a corpus.
 
-- **Differential**: `.ay` against a reference AY player, `.sid` against
-  sidplayfp. Compare rendered output, not screenshots of confidence.
+- **Differential**: `.sid` still requires comparison against sidplayfp in
+  #38. AY has extensive constructed-fixture and full-corpus coverage, but no
+  retained reference-player differential harness; do not rewrite that as a
+  completed claim.
 - **Corpora, both already local**: 696 `.ay.zip` archives under
   `/Volumes/Data/WOS-Archive/music/ay`; HVSC #85 at
   `/Volumes/Data/Library/Music/HVSC_85-all-of-them.7z`.
@@ -225,13 +235,13 @@ family applies to gates.
 
 ## Open questions
 
-- **Bundle size.** Four more crates enter the `.wasm` the page fetches. Measure
-  before committing; this is a web player first, and there is no budget written
-  down yet.
-- **Where the parsers live.** `.ay` and `.sid` parsing may belong in Format198x
-  as standalone crates under the graduation rule. They start here and graduate
-  when a second consumer appears — or they start there, if the ISA-adjacent
-  formats argue for it.
+- **Bundle size (answered for AY).** The shipped AY feature adds 37.7 KiB raw
+  and 13.6 KiB gzipped. SID must be measured independently in #38 rather than
+  inheriting AY's answer.
+- **Where the parsers live.** `.ay` parsing started here and has no second
+  consumer, so it has not graduated. #38 must make the same deliberate choice
+  for `.sid`; either location remains subject to the Format198x graduation
+  rule when a standalone consumer appears.
 - **Whether the host graduates.** If a second project ever needs to run tune
   code, `host` is the part worth extracting. Not now.
 - **Open ROMs**, deferred by decision: the seam above supports loading a ROM

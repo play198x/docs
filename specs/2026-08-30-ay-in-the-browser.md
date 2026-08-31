@@ -1,6 +1,7 @@
 # AY in the browser — design
 
-**Status:** Draft 2026-08-30, awaiting review.
+**Status:** Implemented 2026-08-30 in `play198x-core` 0.4.0,
+`@play198x/web` 0.2.0 and the public player.
 
 **Binding decisions:** [`play198x-media-player.md`](../../../decisions/play198x-media-player.md)
 (umbrella), and the thin-consumer rule in particular.
@@ -32,6 +33,12 @@ Four more crates enter the `.wasm` and cost twelve kilobytes over the wire.
 Naive measurement says 320 bytes, because nothing calls the code and the
 linker removes it; that number is an artefact and is recorded here so it is
 not repeated.
+
+Those figures were the pre-implementation decision measurement. The shipped
+build, measured after the complete boundary and metadata surface landed, adds
+**37.7 KiB raw and 13.6 KiB gzipped**. The difference is why both numbers are
+kept: the first answered whether to proceed; the second is what the released
+feature actually costs.
 
 **The trait's trigger condition has fired.** The previous spec proposed a
 `Player` trait and the plan deferred it "when SID gives it a second
@@ -223,8 +230,12 @@ Named, as everywhere else here.
 
 ## Out of scope
 
-- SID. It is the next slice and this trait is what it will implement.
-- Changing or deprecating `ModulePlayer`. It is published and in use.
+- SID. It remains the next slice and this trait is what it will implement;
+  [play198x/play198x#38](https://github.com/play198x/play198x/issues/38)
+  tracks the bounded ROM-free PSID work.
+- A compatibility alias for `ModulePlayer`. The implementation removed it in
+  favour of the one `Player` boundary described above when the package moved
+  to 0.2.0; keeping both would have preserved two extension points.
 - Seeking within an `.ay`. The format has no seek.
 - The desktop shell.
 
