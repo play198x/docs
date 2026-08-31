@@ -2,9 +2,10 @@
 
 **Status:** AY slice implemented 2026-08-30; ROM-free callable PSID implemented
 2026-08-31 in [play198x/play198x#38](https://github.com/play198x/play198x/issues/38).
-Open-ROM and self-driven SID work were split into
-[#37](https://github.com/play198x/play198x/issues/37) and
-[#39](https://github.com/play198x/play198x/issues/39) respectively.
+The open-ROM decision is settled by
+[`open-roms-do-not-extend-callable-sid-playback.md`](https://github.com/play198x/play198x/blob/main/decisions/open-roms-do-not-extend-callable-sid-playback.md):
+replacement ROMs do not extend callable playback. Self-driven SID work remains
+in [#39](https://github.com/play198x/play198x/issues/39).
 
 **Binding decision:** [`play198x-media-player.md`](../../../decisions/play198x-media-player.md)
 (umbrella), and its thin-consumer rule in particular: Play198x consumes
@@ -250,7 +251,9 @@ family applies to gates.
   rule when a standalone consumer appears.
 - **Whether the host graduates.** If a second project ever needs to run tune
   code, `host` is the part worth extracting. Not now.
-- **Open ROMs**, deferred by decision: the seam above supports loading a ROM
-  image, and slice 3 can add it. The licence needs reading first — GitHub's
-  detector classifies MEGA65/open-roms as `NOASSERTION`, and its CHARGEN is
-  separately LGPL-3.0, against this project's `GPL-2.0-or-later`.
+- **Open ROMs (answered).** They do not extend callable playback. The exact
+  upstream licence and a 5,000-tune compatibility measurement are recorded in
+  the [decision](https://github.com/play198x/play198x/blob/main/decisions/open-roms-do-not-extend-callable-sid-playback.md).
+  Replacement ROMs produced 32 execution candidates—0.64% of the sample—but
+  completion could not establish original-C64 fidelity and would expand the
+  small host toward a machine.
